@@ -1,0 +1,2 @@
+<Put the list of the archives to add to dst_dir (including extension)>
+<e.g : "Sega Rally 2 (United Kingdom)[Unk].zip">

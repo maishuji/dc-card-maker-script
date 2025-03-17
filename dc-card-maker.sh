@@ -26,6 +26,9 @@
 STARTRED="\e[31m"
 ENDRED="\e[0m"
 
+STARTGREEN="\e[32m"
+ENDGREEN="\e[0m"
+
 # Check for required commands
 command -v genisoimage >/dev/null 2>&1 || {
     echo -e "$STARTRED""This script requires genisoimage to be present in the system. Aborting script""$ENDRED" >&2
@@ -64,6 +67,10 @@ OUTPUT_FILE=$3/game_list.txt
 GDMENU_INI=ini/LIST.INI
 ARCHIVE_FILE=archive.txt
 NAME_FILE=name.txt # collides (coincides?) with MadSheep's Windows SD card maker
+echo "Launching script with following params :"
+echo -e "\t LIST_FILE : ${INPUT_FILE}"
+echo -e "\t SOURCE_DIR : ${SOURCE_DIR}"
+echo -e "\t TARGET_DIR : ${TARGET_DIR}"
 
 # Basic sanity checks
 if [[ ! -f $INPUT_FILE ]]; then
@@ -80,6 +87,8 @@ if [[ ! -d $TARGET_DIR ]]; then
     echo "Target directory does not exist : $3" >&2
     exit 4;
 fi
+
+echo -e "Check parameters : ${STARTGREEN}OK${ENDGREEN}"
 
 # If there are any directories with names consisting of digits only and ending
 # with an underscore it means there are leftovers from previous script run.
@@ -138,6 +147,7 @@ echo "Created temporary directory for extracting archives: $TMP_UNZIP_DIR"
 # Directory 01 reserved for GDMenu, start game directories with 02
 INDEX=2
 
+echo "Reading games from the provided list of games..."
 
 while read GAME; do
     echo "Processing game \"$GAME\""
@@ -169,15 +179,25 @@ while read GAME; do
         GAME_ARCHIVE="$SOURCE_DIR/$GAME"
         GAME_TARGET_DIR="$TARGET_DIR/$DIR_NAME"
         GAME_TMP_DIR="$TMP_UNZIP_DIR/$DIR_NAME"
-
+        echo "Processing game archive : ${GAME_ARCHIVE}"
+        
         # Missing archives are not considered fatal, just skip the game
         if [[ ! -f "$GAME_ARCHIVE" ]]; then
             echo -e "$STARTRED""Game archive not found: \"$GAME_ARCHIVE\", skipping""$ENDRED"
             break
         fi
 
-        echo "Extracting archive $GAME_ARCHIVE to temporary directory $GAME_TMP_DIR"
-        unzip "$GAME_ARCHIVE" -d "$GAME_TMP_DIR"
+        if file "$GAME_ARCHIVE" | grep -q "7-zip archive"; then
+            echo -e "$GAME_ARCHIVE is a ${STARTGREEN}7z archive${ENDGREEN}."
+            echo "Extracting archive $GAME_ARCHIVE to temporary directory $GAME_TMP_DIR"
+            7z x "${GAME_ARCHIVE}" -o"$GAME_TMP_DIR"
+            echo -e "Extracting of 7z processed : ${STARTGREEN}OK${ENDGREEN}"
+        else
+            echo "$GAME_ARCHIVE is not a 7z archive."
+            echo "Extracting archive $GAME_ARCHIVE to temporary directory $GAME_TMP_DIR"
+            unzip "$GAME_ARCHIVE" -d "$GAME_TMP_DIR"
+        fi
+        
 
         # Extracting errors are fatal - maybe we have no space left on the
         # device?  Abort the script instead of wreaking havoc
@@ -187,6 +207,7 @@ while read GAME; do
             exit;
         fi
 
+        echo "Check wether it is a GDI or CDI image at ${GAME_TMP_DIR} ..."
         # Determine whether we are dealing with GDI or CDI image.
         DISC_FILE=`find "$GAME_TMP_DIR" -type f -name *.gdi | head -n 1`
         if [[ ! -z $DISC_FILE ]]; then
@@ -195,6 +216,7 @@ while read GAME; do
             DISC_FILE=`find "$GAME_TMP_DIR" -type f -name *.cdi | head -n 1`
             TYPE="cdi"
         fi
+        echo -e "Format found is ${STARTGREEN}${TYPE}${ENDGREEN}"
 
         # If we didn't find a GDI or CDI image inside the extracted archive we
         # skip it.  This isn't perfect since the error message might get lost in
@@ -212,6 +234,19 @@ while read GAME; do
         # Rename the gdi/cdi file to disc.gdi/disc.cdi, move the extracted game
         # to target directory, add the game to the game list
         echo "Writing $ARCHIVE_FILE"
+        
+        # Check if there is a sub directory, and go into it if found
+        # This is due the the fact the extracting process may have created a intermediate folder
+        # Check if there is exactly ONE subdirectory inside $GAME_TMP_DIR
+        SUBDIR=$(find "$GAME_TMP_DIR" -mindepth 1 -maxdepth 1 -type d | head -n 1)
+
+        if [[ -d "$SUBDIR" ]]; then
+            echo "Intermediate folder detected: $SUBDIR"
+            # Move contents of the subdirectory to $GAME_TMP_DIR
+            mv "$SUBDIR"/* "$GAME_TMP_DIR/"
+            rmdir "$SUBDIR"  # Remove the now-empty folder
+        fi
+        
         echo "$GAME" > "$GAME_TMP_DIR/$ARCHIVE_FILE"
         if [[ ! -e "$GAME_TMP_DIR/disc.$TYPE" ]]; then
             echo "Renaming disc file \"$DISC_FILE\" to \"disc.$TYPE\""
@@ -286,7 +321,7 @@ done < "$INPUT_FILE"
 # Build GDMenu cdi image and put it in 01 directory
 echo "Building GDMenu disc image"
 genisoimage -C 0,11702 -V GDMENU -G data/ip.bin -r -J -l -input-charset iso8859-1 -o gdmenu.iso data/1ST_READ.BIN $GDMENU_INI
-./tools/cdi4dc gdmenu.iso gdmenu.cdi
+./tools/cdi4dc gdmenu.iso gdmenu.cdi >/dev/null 2>&1
 rm gdmenu.iso
 mkdir "$TARGET_DIR/01"
 mv gdmenu.cdi "$TARGET_DIR/01"

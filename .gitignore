@@ -7,3 +7,5 @@ gdmenu.iso
 # binary tools
 tools/cdi4dc
 tools/cdirip
+src_dir/*
+dst_dir/*
