@@ -1,2 +1,12 @@
-<Put the list of the archives to add to dst_dir (including extension)>
-<e.g : "Sega Rally 2 (United Kingdom)[Unk].zip">
+dc_ip_load_2_0_1.zip
+xdp_le_r4.zip
+Gauntlet_Legends_us.zip
+Propeller_Arena.zip
+Sega_Rally_2.zip
+4_Wheel_Thunder.zip
+Psyvariar_2_The_Will_to_Fabricate_Japan.zip
+Shikigami_no_Shiro_II_Japan.7z
+Outtrigger_USA.7z
+Tennis_2K2_USA.7z
+Faster_than_speed_gdi.zip
+F1_World_Grand_Prix_II.zip
