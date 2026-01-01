@@ -1,4 +1,4 @@
-.PHONY: run-dst run-delete run-sd install-genisoimage install-cdi4dc check-deps
+.PHONY: run-dst run-delete run-sd install-genisoimage install-cdi4dc install-cdirip check-deps
 
 run-dst:
 	@echo "Running tests..."
@@ -18,6 +18,10 @@ install-genisoimage:
 install-cdi4dc:
 	@echo "Installing cdi4dc from sources..."
 	./install-cdi4dc.sh
+
+install-cdirip:
+	@echo "Installing cdirip from sources..."
+	./install-cdirip.sh
 
 check-deps:
 	@echo "Checking required dependencies..."
