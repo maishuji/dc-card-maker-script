@@ -209,11 +209,11 @@ while read GAME; do
 
         echo "Check wether it is a GDI or CDI image at ${GAME_TMP_DIR} ..."
         # Determine whether we are dealing with GDI or CDI image.
-        DISC_FILE=`find "$GAME_TMP_DIR" -type f -name *.gdi | head -n 1`
+        DISC_FILE=`find "$GAME_TMP_DIR" -type f -name '*.gdi' | head -n 1`
         if [[ ! -z $DISC_FILE ]]; then
             TYPE="gdi"
         else
-            DISC_FILE=`find "$GAME_TMP_DIR" -type f -name *.cdi | head -n 1`
+            DISC_FILE=`find "$GAME_TMP_DIR" -type f -name '*.cdi' | head -n 1`
             TYPE="cdi"
         fi
         echo -e "Format found is ${STARTGREEN}${TYPE}${ENDGREEN}"
@@ -247,6 +247,51 @@ while read GAME; do
             rmdir "$SUBDIR"  # Remove the now-empty folder
         fi
         
+        # For GDI files, rename track files to simple names and update GDI file
+        # This avoids issues with gditools.py not properly handling quoted filenames
+        if [[ "$TYPE" == "gdi" ]]; then
+            GDI_FILE=`find "$GAME_TMP_DIR" -type f -name '*.gdi' | head -n 1`
+            
+            if [[ -f "$GDI_FILE" ]]; then
+                # Create a temporary file for the new GDI content
+                TMP_GDI="$GAME_TMP_DIR/disc.gdi.tmp"
+                
+                # Read the GDI file and rename tracks
+                track_num=1
+                while IFS= read -r line; do
+                    # Skip the first line (track count)
+                    if [[ $track_num -eq 1 ]] && [[ ! "$line" =~ ^[0-9]+[[:space:]] ]]; then
+                        echo "$line" > "$TMP_GDI"
+                        continue
+                    fi
+                    
+                    # Extract the quoted filename from the line
+                    if [[ "$line" =~ \"([^\"]+)\" ]]; then
+                        old_filename="${BASH_REMATCH[1]}"
+                        # Create new simple filename
+                        extension="${old_filename##*.}"
+                        new_filename="track${track_num}.${extension}"
+                        
+                        # Rename the actual file
+                        if [[ -f "$GAME_TMP_DIR/$old_filename" ]]; then
+                            mv "$GAME_TMP_DIR/$old_filename" "$GAME_TMP_DIR/$new_filename"
+                        fi
+                        
+                        # Update the line in GDI file (remove quotes for simple names)
+                        new_line=$(echo "$line" | sed "s|\"$old_filename\"|$new_filename|g")
+                        echo "$new_line" >> "$TMP_GDI"
+                        
+                        ((track_num++))
+                    else
+                        echo "$line" >> "$TMP_GDI"
+                    fi
+                done < "$GDI_FILE"
+                
+                # Replace old GDI file with new one
+                mv "$TMP_GDI" "$GDI_FILE"
+            fi
+        fi
+        
         echo "$GAME" > "$GAME_TMP_DIR/$ARCHIVE_FILE"
         if [[ ! -e "$GAME_TMP_DIR/disc.$TYPE" ]]; then
             echo "Renaming disc file \"$DISC_FILE\" to \"disc.$TYPE\""
@@ -263,7 +308,7 @@ while read GAME; do
     else
         # If a game was already extracted just determine whether we are dealing
         # with GDI or CDI image.
-        if [[ ! -z `find "$TARGET_DIR/$DIR_NAME" -type f -name *.gdi | head -n 1` ]]; then
+        if [[ ! -z `find "$TARGET_DIR/$DIR_NAME" -type f -name '*.gdi' | head -n 1` ]]; then
             TYPE="gdi"
         else
             TYPE="cdi"
@@ -282,10 +327,10 @@ while read GAME; do
         METADATA_FILE="$TARGET_DIR/$DIR_NAME/ip.bin"
     else
         TMP_DIR=`mktemp -d -t dc-card-maker-XXXXX`
-        ./tools/cdirip "$TARGET_DIR/$DIR_NAME/disc.cdi" $TMP_DIR
+        ./tools/cdirip "$TARGET_DIR/$DIR_NAME/disc.cdi" "$TMP_DIR"
         # Note: this is potentially fragile, assumes data tracks have *.iso
         # extension
-        METADATA_FILE=`find $TMP_DIR -type f -name *.iso | sort | tail -n 1`
+        METADATA_FILE=`find "$TMP_DIR" -type f -name '*.iso' | sort | tail -n 1`
     fi
 
     # Get the metadata
